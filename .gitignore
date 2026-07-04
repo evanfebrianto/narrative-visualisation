@@ -1,1 +1,8 @@
 .DS_Store
+
+# Course docs and reference materials (not part of the public site)
+materials/
+discussions.md
+essay.md
+instruction.md
+quiz-notes.md
