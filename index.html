@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CO2 Emissions Narrative Visualization</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="hero">
+      <p class="eyebrow">CS 416 Narrative Visualization</p>
+      <h1>CO2 Emissions: The Rise, the Drivers, and the Per-Capita Twist</h1>
+      <p class="hero-copy">
+        A martini-glass narrative: follow the guided story first, then explore countries and metrics on your own.
+      </p>
+    </header>
+
+    <section class="story-card" aria-live="polite">
+      <div class="story-topbar">
+        <div>
+          <p class="scene-kicker" id="scene-kicker">Scene 1 of 4</p>
+          <h2 id="scene-title">Loading visualization...</h2>
+        </div>
+        <div class="scene-progress" aria-hidden="true">
+          <span id="progress-fill"></span>
+        </div>
+      </div>
+
+      <p id="scene-summary" class="scene-summary"></p>
+
+      <div id="controls" class="controls is-hidden"></div>
+
+      <div class="chart-wrap">
+        <svg id="chart" viewBox="0 0 960 560" role="img" aria-labelledby="scene-title scene-summary"></svg>
+        <div id="tooltip" class="tooltip is-hidden"></div>
+      </div>
+
+      <nav class="story-nav" aria-label="Story navigation">
+        <button id="prev-scene" type="button">Previous</button>
+        <button id="next-scene" type="button">Next</button>
+      </nav>
+    </section>
+
+    <footer class="source-note">
+      Data: <a href="https://github.com/owid/co2-data" target="_blank" rel="noopener">Our World in Data CO2 dataset</a>.
+      Built with D3 and d3-annotation.
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-annotation/2.5.1/d3-annotation.min.js"></script>
+  <script src="js/scenes.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
