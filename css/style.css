@@ -123,15 +123,36 @@ h2 {
 }
 
 .controls {
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr) auto;
+  display: block;
   gap: 16px;
-  align-items: end;
   margin: 22px 34px 0;
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.54);
+}
+
+.controls-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(260px, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.explore-hint,
+.comparison-note {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+  font-size: 0.95rem;
+}
+
+.comparison-note {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  color: var(--ink);
 }
 
 .controls.is-hidden {
@@ -191,12 +212,14 @@ h2 {
 .chart-wrap {
   position: relative;
   margin: 12px 22px 0;
+  overflow: visible;
 }
 
 #chart {
   display: block;
   width: 100%;
-  min-height: 420px;
+  min-height: 460px;
+  overflow: visible;
 }
 
 .axis path,
@@ -238,7 +261,12 @@ h2 {
 }
 
 .line-path.is-muted {
-  opacity: 0.24;
+  opacity: 0.28;
+}
+
+.line-path.is-focused {
+  opacity: 1;
+  filter: drop-shadow(0 0 4px rgba(180, 83, 9, 0.18));
 }
 
 .latest-dot {
@@ -246,14 +274,27 @@ h2 {
   stroke-width: 2px;
 }
 
-.annotation-note-title {
-  fill: var(--ink);
+.annotation-note-bg {
+  fill: #fffaf2 !important;
+  fill-opacity: 1 !important;
+  filter: drop-shadow(0 6px 16px rgba(31, 41, 51, 0.1));
+}
+
+.annotation-note-title,
+.annotation-note-title tspan {
+  fill: var(--accent-dark) !important;
   font-weight: 800;
 }
 
-.annotation-note-label {
-  fill: #3f4650;
+.annotation-note-label,
+.annotation-note-label tspan {
+  fill: var(--ink) !important;
   font-size: 12px;
+}
+
+.annotation-subject,
+.annotation-subject path {
+  stroke-width: 2px;
 }
 
 .annotation path,
@@ -261,7 +302,14 @@ h2 {
   stroke: var(--accent-dark);
 }
 
+.annotation-group {
+  pointer-events: none;
+}
+
 .annotation-subject {
+  fill: #fffaf2;
+  fill-opacity: 0.95;
+  stroke: var(--accent-dark);
   stroke-width: 2px;
 }
 
@@ -281,6 +329,7 @@ h2 {
   max-width: 230px;
   padding: 10px 12px;
   border: 1px solid var(--border);
+  border-left: 4px solid var(--tooltip-accent, var(--accent));
   border-radius: 14px;
   color: var(--ink);
   background: rgba(255, 250, 242, 0.97);
@@ -328,10 +377,11 @@ h2 {
   }
 
   .story-topbar,
-  .controls {
+  .controls-row {
     grid-template-columns: 1fr;
   }
 
+  .controls,
   .story-topbar,
   .scene-summary,
   .controls,

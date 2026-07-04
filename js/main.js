@@ -4,6 +4,7 @@
   const state = {
     sceneIndex: 0,
     selectedCountries: [...topCountries],
+    extraCountry: "",
     metric: "co2",
     yearRange: [1850, 2023]
   };
@@ -90,7 +91,8 @@
       metric: state.metric,
       yearRange: [...state.yearRange],
       fullYearRange: [...context.fullYearRange],
-      selectedCountries: [...state.selectedCountries]
+      selectedCountries: [...state.selectedCountries],
+      extraCountry: state.extraCountry
     };
 
     const scene = window.NarrativeScenes.getSceneCopy(state.sceneIndex);
@@ -115,31 +117,37 @@
       return;
     }
 
-    const extraCountry = state.selectedCountries.find((country) => !topCountries.includes(country)) || "";
+    const extraCountry = state.extraCountry || "";
     elements.controls.classList.remove("is-hidden");
+    const comparisonNote = buildComparisonNote(extraCountry);
     elements.controls.innerHTML = `
-      <div class="control-group">
-        <label class="control-label" for="country-select">Add a comparison country</label>
-        <select id="country-select">
-          <option value="">Top five only</option>
-          ${context.countryNames
-            .filter((country) => !topCountries.includes(country))
-            .map((country) => `<option value="${escapeHtml(country)}"${country === extraCountry ? " selected" : ""}>${escapeHtml(country)}</option>`)
-            .join("")}
-        </select>
-      </div>
-      <div class="control-group">
-        <p class="control-label">Metric</p>
-        <div class="metric-toggle" role="group" aria-label="Metric">
-          <button type="button" data-metric="co2" class="${state.metric === "co2" ? "is-active" : ""}">Total emissions</button>
-          <button type="button" data-metric="co2_per_capita" class="${state.metric === "co2_per_capita" ? "is-active" : ""}">Per capita</button>
+      <p class="explore-hint">Hover over the chart to inspect values by year. Add a country to compare it against the top five.</p>
+      <div class="controls-row">
+        <div class="control-group">
+          <label class="control-label" for="country-select">Add a comparison country</label>
+          <select id="country-select">
+            <option value="">Top five only</option>
+            ${context.countryNames
+              .filter((country) => !topCountries.includes(country))
+              .map((country) => `<option value="${escapeHtml(country)}"${country === extraCountry ? " selected" : ""}>${escapeHtml(country)}</option>`)
+              .join("")}
+          </select>
         </div>
+        <div class="control-group">
+          <p class="control-label">Metric</p>
+          <div class="metric-toggle" role="group" aria-label="Metric">
+            <button type="button" data-metric="co2" class="${state.metric === "co2" ? "is-active" : ""}">Total emissions</button>
+            <button type="button" data-metric="co2_per_capita" class="${state.metric === "co2_per_capita" ? "is-active" : ""}">Per capita</button>
+          </div>
+        </div>
+        <button class="reset-button" type="button" id="reset-years">Reset years</button>
       </div>
-      <button class="reset-button" type="button" id="reset-years">Reset years</button>
+      ${comparisonNote ? `<p id="comparison-note" class="comparison-note">${comparisonNote}</p>` : ""}
     `;
 
     elements.controls.querySelector("#country-select").addEventListener("change", (event) => {
       const country = event.target.value;
+      state.extraCountry = country;
       state.selectedCountries = country ? Array.from(new Set([...topCountries, country])) : [...topCountries];
       render();
     });
@@ -157,13 +165,54 @@
     });
   }
 
+  function buildComparisonNote(extraCountry) {
+    if (!extraCountry) {
+      return "";
+    }
+
+    const metricInfo = window.NarrativeScenes.getMetric(state.metric);
+    const latestYear = state.yearRange[1];
+    const extraValues = context.data.filter(
+      (row) => row.country === extraCountry && Number.isFinite(row[metricInfo.key]) && row.year <= latestYear
+    );
+    const topValues = topCountries.flatMap((country) =>
+      context.data.filter(
+        (row) => row.country === country && Number.isFinite(row[metricInfo.key]) && row.year <= latestYear
+      )
+    );
+
+    if (!extraValues.length || !topValues.length) {
+      return `${escapeHtml(extraCountry)} is highlighted for comparison.`;
+    }
+
+    const extraLatest = extraValues.sort((a, b) => b.year - a.year)[0][metricInfo.key];
+    const topLatest = d3.max(topValues, (row) => row[metricInfo.key]);
+    const ratio = topLatest / Math.max(extraLatest, 0.001);
+
+    if (state.metric === "co2" && ratio >= 25) {
+      return `<strong>${escapeHtml(extraCountry)}</strong> is highlighted, but its total emissions are far smaller than the top five on this linear scale. The line runs near the bottom — switch to <strong>Per capita</strong> for a fairer comparison.`;
+    }
+
+    if (state.metric === "co2" && ratio >= 8) {
+      return `<strong>${escapeHtml(extraCountry)}</strong> is highlighted for comparison. Its total emissions are smaller than the largest emitters, so the line may sit lower on the chart.`;
+    }
+
+    return `<strong>${escapeHtml(extraCountry)}</strong> is highlighted for comparison.`;
+  }
+
   function showTooltip(event, content) {
     const rows = content.rows.map((row) => `<span>${escapeHtml(row)}</span>`).join("<br>");
+    const tooltipWidth = 230;
+    const tooltipHeight = 90;
+    const left = Math.max(12, Math.min(event.clientX + 14, window.innerWidth - tooltipWidth - 12));
+    const top = Math.max(12, Math.min(event.clientY + 14, window.innerHeight - tooltipHeight - 12));
+
     elements.tooltip
       .classed("is-hidden", false)
+      .style("--tooltip-accent", content.color || "#b45309")
       .html(`<strong>${escapeHtml(content.title)}</strong>${rows}`)
-      .style("left", `${event.clientX + 14}px`)
-      .style("top", `${event.clientY + 14}px`);
+      .style("left", `${left}px`)
+      .style("top", `${top}px`);
   }
 
   function hideTooltip() {

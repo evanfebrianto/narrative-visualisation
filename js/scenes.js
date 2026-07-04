@@ -1,10 +1,10 @@
 (function () {
   const config = {
     width: 960,
-    height: 560,
-    margin: { top: 42, right: 164, bottom: 86, left: 82 },
+    height: 620,
+    margin: { top: 64, right: 164, bottom: 120, left: 82 },
     colors: {
-      World: "#1f2933",
+      World: "#b45309",
       China: "#c2410c",
       "United States": "#2563eb",
       India: "#16a34a",
@@ -108,16 +108,33 @@
   }
 
   function findChinaUsCrossover(data) {
-    const china = new Map(cleanValues(data, "China", "co2", [1900, 2100]).map((row) => [row.year, row.co2]));
-    const us = new Map(cleanValues(data, "United States", "co2", [1900, 2100]).map((row) => [row.year, row.co2]));
+    const chinaRows = cleanValues(data, "China", "co2", [1900, 2100]);
+    const usByYear = new Map(cleanValues(data, "United States", "co2", [1900, 2100]).map((row) => [row.year, row.co2]));
 
-    for (let year = 2000; year <= 2025; year += 1) {
-      if (china.has(year) && us.has(year) && china.get(year) > us.get(year)) {
-        return { year, value: china.get(year) };
+    for (let index = 1; index < chinaRows.length; index += 1) {
+      const previous = chinaRows[index - 1];
+      const current = chinaRows[index];
+      const previousUs = usByYear.get(previous.year);
+      const currentUs = usByYear.get(current.year);
+
+      if (!Number.isFinite(previousUs) || !Number.isFinite(currentUs)) {
+        continue;
+      }
+
+      const previousGap = previous.co2 - previousUs;
+      const currentGap = current.co2 - currentUs;
+
+      if (previousGap <= 0 && currentGap > 0) {
+        const progress = previousGap / (previousGap - currentGap);
+        return {
+          year: previous.year + progress * (current.year - previous.year),
+          value: previous.co2 + progress * (current.co2 - previous.co2),
+          labelYear: current.year
+        };
       }
     }
 
-    return { year: 2006, value: china.get(2006) || 6000 };
+    return { year: 2006, value: usByYear.get(2006) || 6000, labelYear: 2006 };
   }
 
   function setupFrame(context) {
@@ -187,7 +204,7 @@
       .defined((row) => Number.isFinite(row[metricInfo.key]))
       .x((row) => x(row.year))
       .y((row) => y(row[metricInfo.key]))
-      .curve(d3.curveMonotoneX);
+      .curve(options.curve || d3.curveMonotoneX);
 
     const paths = frame.plot
       .append("g")
@@ -195,9 +212,27 @@
       .selectAll("path")
       .data(series)
       .join("path")
-      .attr("class", "line-path")
+      .attr("class", (group) => {
+        const classes = ["line-path"];
+        if (options.focusCountry && group.name === options.focusCountry) {
+          classes.push("is-focused");
+        } else if (options.focusCountry) {
+          classes.push("is-muted");
+        }
+        return classes.join(" ");
+      })
+      .attr("data-country", (group) => group.name)
       .attr("stroke", (group) => colorFor(group.name))
-      .attr("stroke-width", (group) => (group.name === "World" ? 3.4 : 2.6))
+      .attr("stroke-width", (group) => {
+        if (options.focusCountry && group.name === options.focusCountry) {
+          return 4.2;
+        }
+        if (group.name === "World") {
+          return 3.4;
+        }
+        return 2.6;
+      })
+      .attr("opacity", (group) => (options.focusCountry && group.name !== options.focusCountry ? 0.28 : 1))
       .attr("d", (group) => line(group.values));
 
     paths.each(function () {
@@ -235,6 +270,32 @@
     }
 
     const { metricInfo, series, x, y } = layer;
+
+    function applyDefaultFocus() {
+      const focusCountry = context.state.extraCountry;
+      frame.plot.selectAll(".line-path").each(function (group) {
+        const path = d3.select(this);
+        const focused = focusCountry && group.name === focusCountry;
+        path
+          .classed("is-focused", focused)
+          .classed("is-muted", Boolean(focusCountry && group.name !== focusCountry))
+          .attr("stroke-width", focused ? 4.2 : group.name === "World" ? 3.4 : 2.6)
+          .attr("opacity", focusCountry && group.name !== focusCountry ? 0.28 : 1);
+      });
+    }
+
+    function setFocusedCountry(name) {
+      frame.plot.selectAll(".line-path").each(function (group) {
+        const path = d3.select(this);
+        const focused = group.name === name;
+        path
+          .classed("is-focused", focused)
+          .classed("is-muted", !focused)
+          .attr("stroke-width", focused ? 4.2 : group.name === "World" ? 3.4 : 2.6)
+          .attr("opacity", focused ? 1 : 0.28);
+      });
+    }
+
     frame.plot
       .append("rect")
       .attr("class", "plot-overlay")
@@ -260,19 +321,25 @@
         });
 
         if (!nearestSeries) {
+          applyDefaultFocus();
           context.hideTooltip();
           return;
         }
 
+        setFocusedCountry(nearestSeries.group.name);
         context.showTooltip(event, {
           title: nearestSeries.group.name,
+          color: colorFor(nearestSeries.group.name),
           rows: [
             `${nearestSeries.point.year}`,
             `${metricInfo.tooltipFormat(nearestSeries.point[metricInfo.key])}`
           ]
         });
       })
-      .on("mouseleave", context.hideTooltip);
+      .on("mouseleave", () => {
+        applyDefaultFocus();
+        context.hideTooltip();
+      });
   }
 
   function drawLegend(frame, series) {
@@ -312,9 +379,87 @@
     const makeAnnotations = d3
       .annotation()
       .type(d3.annotationCalloutCircle)
+      .notePadding(16)
       .annotations(annotations);
 
-    frame.plot.append("g").attr("class", "annotation-group").call(makeAnnotations);
+    frame.plot.append("g").attr("class", "annotation-group").call(makeAnnotations).raise();
+
+    frame.plot.selectAll(".annotation-note").each(function () {
+      const note = d3.select(this);
+      const rect = note.select(".annotation-note-bg");
+      const content = note.select(".annotation-note-content");
+      const pad = 8;
+      const x = Number(rect.attr("x") || 0);
+      const y = Number(rect.attr("y") || 0);
+      const width = Number(rect.attr("width"));
+      const height = Number(rect.attr("height"));
+
+      rect
+        .attr("x", x - pad)
+        .attr("y", y - pad)
+        .attr("width", width + pad * 2)
+        .attr("height", height + pad * 2)
+        .attr("fill", "#fffaf2")
+        .attr("fill-opacity", 1)
+        .attr("rx", 12)
+        .attr("ry", 12);
+
+      const transform = content.attr("transform") || "";
+      content.attr("transform", `${transform} translate(${pad}, ${pad})`.trim());
+    });
+
+    frame.plot.selectAll(".annotation-subject .subject").attr("stroke-width", 2);
+
+    nudgeAnnotationsIntoPlot(frame);
+    nudgeAnnotationsIntoPlot(frame);
+  }
+
+  function nudgeAnnotationsIntoPlot(frame) {
+    const padding = 14;
+    const plotNode = frame.plot.node();
+    const plotRect = plotNode.getBoundingClientRect();
+    const scaleX = frame.innerWidth / plotRect.width;
+    const scaleY = frame.innerHeight / plotRect.height;
+
+    frame.plot.selectAll("g.annotation").each(function () {
+      const annotation = d3.select(this);
+      const background = annotation.select(".annotation-note-bg").node();
+      if (!background) {
+        return;
+      }
+
+      const noteRect = background.getBoundingClientRect();
+      let shiftX = 0;
+      let shiftY = 0;
+
+      if (noteRect.left < plotRect.left + padding) {
+        shiftX += plotRect.left + padding - noteRect.left;
+      }
+      if (noteRect.top < plotRect.top + padding) {
+        shiftY += plotRect.top + padding - noteRect.top;
+      }
+      if (noteRect.right > plotRect.right - padding) {
+        shiftX -= noteRect.right - (plotRect.right - padding);
+      }
+      if (noteRect.bottom > plotRect.bottom - padding) {
+        shiftY -= noteRect.bottom - (plotRect.bottom - padding);
+      }
+
+      if (!shiftX && !shiftY) {
+        return;
+      }
+
+      const transform = annotation.attr("transform") || "";
+      const match = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(transform);
+      if (!match) {
+        return;
+      }
+
+      annotation.attr(
+        "transform",
+        `translate(${Number(match[1]) + shiftX * scaleX}, ${Number(match[2]) + shiftY * scaleY})`
+      );
+    });
   }
 
   function drawLineChart(context, options) {
@@ -418,8 +563,8 @@
         {
           year: point1950.year,
           value: point1950.co2,
-          dx: 78,
-          dy: -96,
+          dx: -188,
+          dy: -118,
           subject: { radius: 8 },
           note: {
             title: "Post-1950 acceleration",
@@ -440,16 +585,17 @@
       metric: "co2",
       series,
       xDomain: yearRange,
+      curve: d3.curveLinear,
       annotations: [
         {
           year: crossover.year,
           value: crossover.value,
           dx: -160,
           dy: -76,
-          subject: { radius: 8 },
+          subject: { radius: 7, stroke: "#c2410c", fill: "#fffaf2", fillOpacity: 0.95 },
           note: {
             title: "A leadership shift",
-            label: `China overtakes the United States in annual emissions around ${crossover.year}.`,
+            label: `China overtakes the United States in annual emissions around ${crossover.labelYear}.`,
             wrap: 185
           }
         }
@@ -465,33 +611,33 @@
     const annotations = [];
 
     if (us?.values?.length) {
-      const usPoint = nearestYear(us.values, 2005);
+      const usPoint = nearestYear(us.values, 1985);
       annotations.push({
         year: usPoint.year,
         value: usPoint.co2_per_capita,
-        dx: -150,
-        dy: -58,
-        subject: { radius: 8 },
+        dx: -205,
+        dy: -38,
+        subject: { radius: 7, stroke: "#2563eb", fill: "#fffaf2", fillOpacity: 0.95 },
         note: {
           title: "High per-person footprint",
           label: "The United States remains much higher per person than the biggest emerging emitters.",
-          wrap: 190
+          wrap: 160
         }
       });
     }
 
     if (india?.values?.length) {
-      const indiaPoint = nearestYear(india.values, 2005);
+      const indiaPoint = nearestYear(india.values, 2012);
       annotations.push({
         year: indiaPoint.year,
         value: indiaPoint.co2_per_capita,
-        dx: 74,
-        dy: -70,
-        subject: { radius: 7 },
+        dx: -176,
+        dy: -98,
+        subject: { radius: 7, stroke: "#16a34a", fill: "#fffaf2", fillOpacity: 0.95 },
         note: {
           title: "Scale is not the same as intensity",
           label: "India is a major total emitter, but its per-capita emissions stay comparatively low.",
-          wrap: 190
+          wrap: 160
         }
       });
     }
@@ -507,34 +653,14 @@
   function renderExploreScene(state, context) {
     const metric = state.metric;
     const selectedCountries = state.selectedCountries.length ? state.selectedCountries : context.topCountries;
+    const extraCountry = state.extraCountry || "";
     const series = buildSeries(context.data, selectedCountries, metric, state.yearRange);
-    const metricInfo = getMetric(metric);
-    const highestLatest = series
-      .map((group) => ({ name: group.name, value: latestValue(group.values) }))
-      .sort((a, b) => d3.descending(a.value[metricInfo.key], b.value[metricInfo.key]))[0];
-
-    const annotations = highestLatest
-      ? [
-          {
-            year: highestLatest.value.year,
-            value: highestLatest.value[metricInfo.key],
-            dx: -142,
-            dy: -66,
-            subject: { radius: 8 },
-            note: {
-              title: "Your comparison point",
-              label: `Hover over any line to inspect exact ${metricInfo.shortLabel.toLowerCase()} values by year.`,
-              wrap: 190
-            }
-          }
-        ]
-      : [];
 
     drawLineChart(context, {
       metric,
       series,
       xDomain: state.yearRange,
-      annotations,
+      focusCountry: extraCountry || null,
       tooltip: true,
       brush: true,
       lineDuration: 520
