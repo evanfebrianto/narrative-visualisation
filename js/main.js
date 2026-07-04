@@ -85,6 +85,14 @@
   }
 
   function render() {
+    window.__narrativeState = {
+      sceneIndex: state.sceneIndex,
+      metric: state.metric,
+      yearRange: [...state.yearRange],
+      fullYearRange: [...context.fullYearRange],
+      selectedCountries: [...state.selectedCountries]
+    };
+
     const scene = window.NarrativeScenes.getSceneCopy(state.sceneIndex);
     elements.sceneKicker.textContent = scene.kicker;
     elements.sceneTitle.textContent = scene.title;
@@ -115,6 +123,7 @@
         <select id="country-select">
           <option value="">Top five only</option>
           ${context.countryNames
+            .filter((country) => !topCountries.includes(country))
             .map((country) => `<option value="${escapeHtml(country)}"${country === extraCountry ? " selected" : ""}>${escapeHtml(country)}</option>`)
             .join("")}
         </select>

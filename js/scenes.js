@@ -211,22 +211,6 @@
         .attr("stroke-dashoffset", 0);
     });
 
-    if (options.tooltip) {
-      paths
-        .attr("stroke-width", 4)
-        .style("cursor", "pointer")
-        .on("mousemove", function (event, group) {
-          const [mouseX] = d3.pointer(event, frame.plot.node());
-          const year = Math.round(x.invert(mouseX));
-          const point = nearestYear(group.values, year);
-          context.showTooltip(event, {
-            title: group.name,
-            rows: [`${point.year}`, `${metricInfo.tooltipFormat(point[metricInfo.key])}`]
-          });
-        })
-        .on("mouseleave", context.hideTooltip);
-    }
-
     frame.plot
       .append("g")
       .selectAll("circle")
@@ -241,6 +225,54 @@
       .delay(600)
       .duration(260)
       .attr("r", 4.5);
+
+    return { metricInfo, series, x, y };
+  }
+
+  function addTooltipOverlay(context, frame, layer) {
+    if (!layer) {
+      return;
+    }
+
+    const { metricInfo, series, x, y } = layer;
+    frame.plot
+      .append("rect")
+      .attr("class", "plot-overlay")
+      .attr("width", frame.innerWidth)
+      .attr("height", frame.innerHeight)
+      .attr("fill", "transparent")
+      .style("cursor", "crosshair")
+      .raise()
+      .on("mousemove", function (event) {
+        const [mouseX, mouseY] = d3.pointer(event);
+        const year = Math.round(x.invert(mouseX));
+        let nearestSeries = null;
+        let nearestDistance = Infinity;
+
+        series.forEach((group) => {
+          const point = nearestYear(group.values, year);
+          const pointY = y(point[metricInfo.key]);
+          const distance = Math.abs(pointY - mouseY);
+          if (distance < nearestDistance) {
+            nearestDistance = distance;
+            nearestSeries = { group, point };
+          }
+        });
+
+        if (!nearestSeries) {
+          context.hideTooltip();
+          return;
+        }
+
+        context.showTooltip(event, {
+          title: nearestSeries.group.name,
+          rows: [
+            `${nearestSeries.point.year}`,
+            `${metricInfo.tooltipFormat(nearestSeries.point[metricInfo.key])}`
+          ]
+        });
+      })
+      .on("mouseleave", context.hideTooltip);
   }
 
   function drawLegend(frame, series) {
@@ -298,7 +330,7 @@
     const y = d3.scaleLinear().domain([0, yMax * 1.1]).nice().range([frame.innerHeight, 0]);
 
     drawAxes(frame, x, y, metricInfo);
-    drawLines(context, frame, options.series, x, y, metricInfo, options);
+    const layer = drawLines(context, frame, options.series, x, y, metricInfo, options);
     drawLegend(frame, options.series);
 
     const annotations = (options.annotations || []).map((annotation) => {
@@ -310,21 +342,26 @@
     });
     addAnnotations(frame, annotations);
 
+    if (options.tooltip) {
+      addTooltipOverlay(context, frame, layer);
+    }
+
     if (options.brush) {
       addBrush(context, frame, x);
     }
   }
 
   function addBrush(context, frame, x) {
-    const brushY = frame.innerHeight + 58;
+    const brushHeight = 28;
+    const brushTop = frame.innerHeight + 24;
     const brush = d3
       .brushX()
       .extent([
-        [0, frame.innerHeight + 28],
-        [frame.innerWidth, brushY]
+        [0, brushTop],
+        [frame.innerWidth, brushTop + brushHeight]
       ])
       .on("end", (event) => {
-        if (!event.selection) {
+        if (!event.selection || !event.sourceEvent) {
           return;
         }
 
@@ -341,10 +378,18 @@
       .append("text")
       .attr("class", "brush-hint")
       .attr("x", 0)
-      .attr("y", frame.innerHeight + 22)
+      .attr("y", frame.innerHeight + 18)
       .text("Brush the timeline below to narrow the year range.");
 
-    frame.plot.append("g").attr("class", "brush").call(brush);
+    const brushGroup = frame.plot.append("g").attr("class", "brush").call(brush);
+    const [minYear, maxYear] = context.state.yearRange;
+    const fullRange = context.fullYearRange;
+    const isPartial =
+      minYear > fullRange[0] + 1 || maxYear < fullRange[1] - 1;
+
+    if (isPartial) {
+      brushGroup.call(brush.move, [x(minYear), x(maxYear)]);
+    }
   }
 
   function renderSceneOne(state, context) {
@@ -417,39 +462,45 @@
     const series = buildSeries(context.data, context.topCountries, "co2_per_capita", yearRange);
     const us = series.find((group) => group.name === "United States");
     const india = series.find((group) => group.name === "India");
-    const usPoint = nearestYear(us.values, 2005);
-    const indiaPoint = nearestYear(india.values, 2005);
+    const annotations = [];
+
+    if (us?.values?.length) {
+      const usPoint = nearestYear(us.values, 2005);
+      annotations.push({
+        year: usPoint.year,
+        value: usPoint.co2_per_capita,
+        dx: -150,
+        dy: -58,
+        subject: { radius: 8 },
+        note: {
+          title: "High per-person footprint",
+          label: "The United States remains much higher per person than the biggest emerging emitters.",
+          wrap: 190
+        }
+      });
+    }
+
+    if (india?.values?.length) {
+      const indiaPoint = nearestYear(india.values, 2005);
+      annotations.push({
+        year: indiaPoint.year,
+        value: indiaPoint.co2_per_capita,
+        dx: 74,
+        dy: -70,
+        subject: { radius: 7 },
+        note: {
+          title: "Scale is not the same as intensity",
+          label: "India is a major total emitter, but its per-capita emissions stay comparatively low.",
+          wrap: 190
+        }
+      });
+    }
 
     drawLineChart(context, {
       metric: "co2_per_capita",
       series,
       xDomain: yearRange,
-      annotations: [
-        {
-          year: usPoint.year,
-          value: usPoint.co2_per_capita,
-          dx: -150,
-          dy: -58,
-          subject: { radius: 8 },
-          note: {
-            title: "High per-person footprint",
-            label: "The United States remains much higher per person than the biggest emerging emitters.",
-            wrap: 190
-          }
-        },
-        {
-          year: indiaPoint.year,
-          value: indiaPoint.co2_per_capita,
-          dx: 74,
-          dy: -70,
-          subject: { radius: 7 },
-          note: {
-            title: "Scale is not the same as intensity",
-            label: "India is a major total emitter, but its per-capita emissions stay comparatively low.",
-            wrap: 190
-          }
-        }
-      ]
+      annotations
     });
   }
 

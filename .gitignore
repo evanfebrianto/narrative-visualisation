@@ -1,8 +1,16 @@
 .DS_Store
 
-# Course docs and reference materials (not part of the public site)
+# Dev and test artifacts
+node_modules/
+package-lock.json
+package.json
+playwright.config.js
+tests/
+test-results/
+playwright-report/
+
 materials/
 discussions.md
-essay.md
+essay/
 instruction.md
 quiz-notes.md
