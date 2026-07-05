@@ -313,6 +313,10 @@ h2 {
   stroke-width: 2px;
 }
 
+.hover-marker {
+  pointer-events: none;
+}
+
 .brush .selection {
   fill: rgba(180, 83, 9, 0.18);
   stroke: var(--accent);

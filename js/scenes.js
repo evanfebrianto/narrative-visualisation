@@ -158,8 +158,12 @@
     return { root, plot, innerWidth, innerHeight };
   }
 
-  function drawAxes(frame, x, y, metricInfo) {
-    const xAxis = d3.axisBottom(x).tickFormat(d3.format("d")).ticks(8);
+  function drawAxes(frame, x, y, metricInfo, axisOptions = {}) {
+    const xAxis = d3
+      .axisBottom(x)
+      .tickFormat(d3.format("d"))
+      .ticks(axisOptions.hasBrush ? 6 : 8)
+      .tickPadding(axisOptions.hasBrush ? 4 : 8);
     const yAxis = d3.axisLeft(y).ticks(6).tickFormat(metricInfo.axisFormat);
     const yGrid = d3
       .axisLeft(y)
@@ -184,7 +188,7 @@
       .append("text")
       .attr("class", "axis-label")
       .attr("x", frame.innerWidth / 2)
-      .attr("y", frame.innerHeight + 40)
+      .attr("y", frame.innerHeight + (axisOptions.hasBrush ? 28 : 40))
       .attr("text-anchor", "middle")
       .text("Year");
 
@@ -264,12 +268,38 @@
     return { metricInfo, series, x, y };
   }
 
+  function plotPointToClient(svgNode, plotX, plotY) {
+    if (!svgNode || !svgNode.createSVGPoint || !svgNode.getScreenCTM) {
+      return null;
+    }
+
+    const matrix = svgNode.getScreenCTM();
+    if (!matrix) {
+      return null;
+    }
+
+    const point = svgNode.createSVGPoint();
+    point.x = config.margin.left + plotX;
+    point.y = config.margin.top + plotY;
+    const screenPoint = point.matrixTransform(matrix);
+    return { x: screenPoint.x, y: screenPoint.y };
+  }
+
   function addTooltipOverlay(context, frame, layer) {
     if (!layer) {
       return;
     }
 
     const { metricInfo, series, x, y } = layer;
+    const svgNode = frame.plot.node().ownerSVGElement;
+    const hoverMarker = frame.plot
+      .append("circle")
+      .attr("class", "hover-marker")
+      .attr("r", 0)
+      .attr("fill", "#fffaf2")
+      .attr("fill-opacity", 0.92)
+      .attr("stroke-width", 2.5)
+      .style("pointer-events", "none");
 
     function applyDefaultFocus() {
       const focusCountry = context.state.extraCountry;
@@ -312,11 +342,12 @@
 
         series.forEach((group) => {
           const point = nearestYear(group.values, year);
+          const pointX = x(point.year);
           const pointY = y(point[metricInfo.key]);
           const distance = Math.abs(pointY - mouseY);
           if (distance < nearestDistance) {
             nearestDistance = distance;
-            nearestSeries = { group, point };
+            nearestSeries = { group, point, pointX, pointY };
           }
         });
 
@@ -331,15 +362,26 @@
         }
 
         if (!nearestSeries) {
+          hoverMarker.attr("r", 0);
           applyDefaultFocus();
           context.hideTooltip();
           return;
         }
 
+        const accent = colorFor(nearestSeries.group.name);
+        hoverMarker
+          .attr("cx", nearestSeries.pointX)
+          .attr("cy", nearestSeries.pointY)
+          .attr("r", 6.5)
+          .attr("stroke", accent);
+
         setFocusedCountry(nearestSeries.group.name);
-        context.showTooltip(event, {
+        const anchor =
+          plotPointToClient(svgNode, nearestSeries.pointX, nearestSeries.pointY) ||
+          { x: event.clientX, y: event.clientY };
+        context.showTooltip(anchor, {
           title: nearestSeries.group.name,
-          color: colorFor(nearestSeries.group.name),
+          color: accent,
           rows: [
             `${nearestSeries.point.year}`,
             `${metricInfo.tooltipFormat(nearestSeries.point[metricInfo.key])}`
@@ -347,6 +389,7 @@
         });
       })
       .on("mouseleave", () => {
+        hoverMarker.attr("r", 0);
         applyDefaultFocus();
         context.hideTooltip();
       });
@@ -466,15 +509,15 @@
         return;
       }
 
-      const transform = annotation.attr("transform") || "";
-      const match = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(transform);
-      if (!match) {
-        return;
-      }
+      const note = annotation.select(".annotation-note");
+      const noteTransform = note.attr("transform") || "";
+      const match = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(noteTransform);
+      const noteX = match ? Number(match[1]) : 0;
+      const noteY = match ? Number(match[2]) : 0;
 
-      annotation.attr(
+      note.attr(
         "transform",
-        `translate(${Number(match[1]) + shiftX / scaleX}, ${Number(match[2]) + shiftY / scaleY})`
+        `translate(${noteX + shiftX / scaleX}, ${noteY + shiftY / scaleY})`
       );
     });
   }
@@ -491,7 +534,7 @@
     const x = d3.scaleLinear().domain(xDomain).range([0, frame.innerWidth]);
     const y = d3.scaleLinear().domain([0, yMax * 1.1]).nice().range([frame.innerHeight, 0]);
 
-    drawAxes(frame, x, y, metricInfo);
+    drawAxes(frame, x, y, metricInfo, { hasBrush: Boolean(options.brush) });
     const layer = drawLines(context, frame, options.series, x, y, metricInfo, options);
     drawLegend(frame, options.series);
 
@@ -514,8 +557,8 @@
   }
 
   function addBrush(context, frame, x) {
-    const brushHeight = 28;
-    const brushTop = frame.innerHeight + 72;
+    const brushHeight = 24;
+    const brushTop = frame.innerHeight + 48;
     const brush = d3
       .brushX()
       .extent([
@@ -544,13 +587,6 @@
         context.state.yearRange = years;
         context.render();
       });
-
-    frame.plot
-      .append("text")
-      .attr("class", "brush-hint")
-      .attr("x", 0)
-      .attr("y", frame.innerHeight + 60)
-      .text("Brush the timeline below to narrow the year range.");
 
     const brushGroup = frame.plot.append("g").attr("class", "brush").call(brush);
     const [minYear, maxYear] = context.state.yearRange;
@@ -698,9 +734,9 @@
           {
             year: highest.value.year,
             value: highest.value[metricInfo.key],
-            dx: -208,
-            dy: -118,
-            subject: { radius: 9, stroke: colorFor(highest.name), fill: "#fffaf2", fillOpacity: 0.95 },
+            dx: -268,
+            dy: -52,
+            subject: { radius: 7, stroke: colorFor(highest.name), fill: "#fffaf2", fillOpacity: 0.95 },
             note: {
               title: "Start exploring",
               label:

@@ -125,7 +125,7 @@
     elements.controls.classList.remove("is-hidden");
     const comparisonNote = buildComparisonNote(extraCountry);
     elements.controls.innerHTML = `
-      <p class="explore-hint">Hover over the chart to inspect values by year. Add a country to compare it against the top five.</p>
+      <p class="explore-hint">Hover over the chart to inspect values by year. Add a country to compare, or brush the timeline below to narrow the years.</p>
       <div class="controls-row">
         <div class="control-group">
           <label class="control-label" for="country-select">Add a comparison country</label>
@@ -207,12 +207,26 @@
     return `<strong>${escapeHtml(extraCountry)}</strong> is highlighted for comparison.`;
   }
 
-  function showTooltip(event, content) {
+  function showTooltip(anchor, content) {
     const rows = content.rows.map((row) => `<span>${escapeHtml(row)}</span>`).join("<br>");
     const tooltipWidth = 230;
     const tooltipHeight = 90;
-    const left = Math.max(12, Math.min(event.clientX + 14, window.innerWidth - tooltipWidth - 12));
-    const top = Math.max(12, Math.min(event.clientY + 14, window.innerHeight - tooltipHeight - 12));
+    const offset = 14;
+    let left = anchor.x + offset;
+    let top = anchor.y - tooltipHeight / 2;
+
+    if (left + tooltipWidth > window.innerWidth - 12) {
+      left = anchor.x - tooltipWidth - offset;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+    if (top < 12) {
+      top = anchor.y + offset;
+    }
+    if (top + tooltipHeight > window.innerHeight - 12) {
+      top = anchor.y - tooltipHeight - offset;
+    }
 
     elements.tooltip
       .classed("is-hidden", false)
