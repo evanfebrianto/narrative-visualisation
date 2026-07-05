@@ -65,7 +65,14 @@
       key: "co2",
       label: "CO2 emissions (million tonnes)",
       shortLabel: "Annual emissions",
-      axisFormat: (value) => (value >= 1000 ? `${d3.format(".0f")(value / 1000)} Gt` : d3.format(".0f")(value)),
+      axisFormat: (value) => {
+        if (value >= 1000) {
+          const gigatonnes = value / 1000;
+          const format = gigatonnes < 10 && !Number.isInteger(gigatonnes) ? ".1f" : ".0f";
+          return `${d3.format(format)(gigatonnes)} Gt`;
+        }
+        return d3.format(".0f")(value);
+      },
       tooltipFormat: (value) => `${d3.format(",.1f")(value)} million tonnes`
     };
   }
@@ -202,7 +209,23 @@
       .text(metricInfo.label);
   }
 
+  function focusSetFromOptions(options) {
+    if (options.focusCountries?.length) {
+      return new Set(options.focusCountries);
+    }
+    if (options.focusCountry) {
+      return new Set([options.focusCountry]);
+    }
+    return new Set();
+  }
+
+  function isFocusedCountry(name, focusSet) {
+    return focusSet.has(name);
+  }
+
   function drawLines(context, frame, series, x, y, metricInfo, options) {
+    const focusSet = focusSetFromOptions(options);
+    const hasFocus = focusSet.size > 0;
     const line = d3
       .line()
       .defined((row) => Number.isFinite(row[metricInfo.key]))
@@ -218,9 +241,9 @@
       .join("path")
       .attr("class", (group) => {
         const classes = ["line-path"];
-        if (options.focusCountry && group.name === options.focusCountry) {
+        if (hasFocus && isFocusedCountry(group.name, focusSet)) {
           classes.push("is-focused");
-        } else if (options.focusCountry) {
+        } else if (hasFocus) {
           classes.push("is-muted");
         }
         return classes.join(" ");
@@ -228,15 +251,15 @@
       .attr("data-country", (group) => group.name)
       .attr("stroke", (group) => colorFor(group.name))
       .attr("stroke-width", (group) => {
-        if (options.focusCountry && group.name === options.focusCountry) {
-          return 4.2;
+        if (hasFocus && isFocusedCountry(group.name, focusSet)) {
+          return 3.6;
         }
         if (group.name === "World") {
           return 3.4;
         }
-        return 2.6;
+        return hasFocus ? 2.2 : 2.6;
       })
-      .attr("opacity", (group) => (options.focusCountry && group.name !== options.focusCountry ? 0.28 : 1))
+      .attr("opacity", (group) => (hasFocus && !isFocusedCountry(group.name, focusSet) ? 0.22 : 1))
       .attr("d", (group) => line(group.values));
 
     paths.each(function () {
@@ -260,6 +283,7 @@
       .attr("cy", (item) => y(item.value[metricInfo.key]))
       .attr("r", 0)
       .attr("fill", (item) => colorFor(item.name))
+      .attr("opacity", (item) => (hasFocus && !isFocusedCountry(item.name, focusSet) ? 0.22 : 1))
       .transition()
       .delay(600)
       .duration(260)
@@ -710,6 +734,7 @@
       metric: "co2_per_capita",
       series,
       xDomain: yearRange,
+      focusCountries: ["United States", "India"],
       annotations
     });
   }
