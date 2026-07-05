@@ -184,7 +184,7 @@
       .append("text")
       .attr("class", "axis-label")
       .attr("x", frame.innerWidth / 2)
-      .attr("y", frame.innerHeight + 48)
+      .attr("y", frame.innerHeight + 40)
       .attr("text-anchor", "middle")
       .text("Year");
 
@@ -320,6 +320,16 @@
           }
         });
 
+        if (!context.state.hasInteracted) {
+          context.state.hasInteracted = true;
+          frame.plot
+            .selectAll(".annotation-group")
+            .transition()
+            .duration(220)
+            .style("opacity", 0)
+            .remove();
+        }
+
         if (!nearestSeries) {
           applyDefaultFocus();
           context.hideTooltip();
@@ -416,10 +426,17 @@
 
   function nudgeAnnotationsIntoPlot(frame) {
     const padding = 14;
-    const plotNode = frame.plot.node();
-    const plotRect = plotNode.getBoundingClientRect();
-    const scaleX = frame.innerWidth / plotRect.width;
-    const scaleY = frame.innerHeight / plotRect.height;
+    const svgNode = frame.plot.node().ownerSVGElement;
+    if (!svgNode) {
+      return;
+    }
+    const svgRect = svgNode.getBoundingClientRect();
+    const scaleX = svgRect.width / config.width;
+    const scaleY = svgRect.height / config.height;
+    const plotLeft = svgRect.left + config.margin.left * scaleX;
+    const plotTop = svgRect.top + config.margin.top * scaleY;
+    const plotRight = svgRect.left + (config.margin.left + frame.innerWidth) * scaleX;
+    const plotBottom = svgRect.top + (config.margin.top + frame.innerHeight) * scaleY;
 
     frame.plot.selectAll("g.annotation").each(function () {
       const annotation = d3.select(this);
@@ -432,17 +449,17 @@
       let shiftX = 0;
       let shiftY = 0;
 
-      if (noteRect.left < plotRect.left + padding) {
-        shiftX += plotRect.left + padding - noteRect.left;
+      if (noteRect.left < plotLeft + padding) {
+        shiftX += plotLeft + padding - noteRect.left;
       }
-      if (noteRect.top < plotRect.top + padding) {
-        shiftY += plotRect.top + padding - noteRect.top;
+      if (noteRect.top < plotTop + padding) {
+        shiftY += plotTop + padding - noteRect.top;
       }
-      if (noteRect.right > plotRect.right - padding) {
-        shiftX -= noteRect.right - (plotRect.right - padding);
+      if (noteRect.right > plotRight - padding) {
+        shiftX -= noteRect.right - (plotRight - padding);
       }
-      if (noteRect.bottom > plotRect.bottom - padding) {
-        shiftY -= noteRect.bottom - (plotRect.bottom - padding);
+      if (noteRect.bottom > plotBottom - padding) {
+        shiftY -= noteRect.bottom - (plotBottom - padding);
       }
 
       if (!shiftX && !shiftY) {
@@ -457,7 +474,7 @@
 
       annotation.attr(
         "transform",
-        `translate(${Number(match[1]) + shiftX * scaleX}, ${Number(match[2]) + shiftY * scaleY})`
+        `translate(${Number(match[1]) + shiftX / scaleX}, ${Number(match[2]) + shiftY / scaleY})`
       );
     });
   }
@@ -498,7 +515,7 @@
 
   function addBrush(context, frame, x) {
     const brushHeight = 28;
-    const brushTop = frame.innerHeight + 24;
+    const brushTop = frame.innerHeight + 72;
     const brush = d3
       .brushX()
       .extent([
@@ -506,15 +523,24 @@
         [frame.innerWidth, brushTop + brushHeight]
       ])
       .on("end", (event) => {
-        if (!event.selection || !event.sourceEvent) {
+        if (!event.sourceEvent) {
+          return;
+        }
+
+        if (!event.selection) {
+          context.state.hasInteracted = true;
+          context.state.yearRange = [...context.fullYearRange];
+          context.render();
           return;
         }
 
         const years = event.selection.map(x.invert).map(Math.round).sort(d3.ascending);
         if (years[1] - years[0] < 3) {
+          brushGroup.call(brush.move, null);
           return;
         }
 
+        context.state.hasInteracted = true;
         context.state.yearRange = years;
         context.render();
       });
@@ -523,7 +549,7 @@
       .append("text")
       .attr("class", "brush-hint")
       .attr("x", 0)
-      .attr("y", frame.innerHeight + 18)
+      .attr("y", frame.innerHeight + 60)
       .text("Brush the timeline below to narrow the year range.");
 
     const brushGroup = frame.plot.append("g").attr("class", "brush").call(brush);
@@ -535,6 +561,8 @@
     if (isPartial) {
       brushGroup.call(brush.move, [x(minYear), x(maxYear)]);
     }
+
+    return brushGroup;
   }
 
   function renderSceneOne(state, context) {
@@ -655,12 +683,41 @@
     const selectedCountries = state.selectedCountries.length ? state.selectedCountries : context.topCountries;
     const extraCountry = state.extraCountry || "";
     const series = buildSeries(context.data, selectedCountries, metric, state.yearRange);
+    const metricInfo = getMetric(metric);
+
+    const isFullYearRange =
+      state.yearRange[0] === context.fullYearRange[0] && state.yearRange[1] === context.fullYearRange[1];
+
+    let welcomeAnnotations = [];
+    if (!state.hasInteracted && !extraCountry && isFullYearRange && series.length) {
+      const highest = series
+        .map((group) => ({ name: group.name, value: latestValue(group.values) }))
+        .sort((a, b) => d3.descending(a.value[metricInfo.key], b.value[metricInfo.key]))[0];
+      if (highest && highest.value) {
+        welcomeAnnotations = [
+          {
+            year: highest.value.year,
+            value: highest.value[metricInfo.key],
+            dx: -208,
+            dy: -118,
+            subject: { radius: 9, stroke: colorFor(highest.name), fill: "#fffaf2", fillOpacity: 0.95 },
+            note: {
+              title: "Start exploring",
+              label:
+                "Hover any line for exact values. Add a country above, or brush the timeline below to narrow the years.",
+              wrap: 215
+            }
+          }
+        ];
+      }
+    }
 
     drawLineChart(context, {
       metric,
       series,
       xDomain: state.yearRange,
       focusCountry: extraCountry || null,
+      annotations: welcomeAnnotations,
       tooltip: true,
       brush: true,
       lineDuration: 520

@@ -6,7 +6,8 @@
     selectedCountries: [...topCountries],
     extraCountry: "",
     metric: "co2",
-    yearRange: [1850, 2023]
+    yearRange: [1850, 2023],
+    hasInteracted: false
   };
 
   const elements = {
@@ -35,11 +36,13 @@
 
   elements.prevButton.addEventListener("click", () => {
     state.sceneIndex = Math.max(0, state.sceneIndex - 1);
+    state.hasInteracted = false;
     render();
   });
 
   elements.nextButton.addEventListener("click", () => {
     state.sceneIndex = Math.min(window.NarrativeScenes.sceneCount - 1, state.sceneIndex + 1);
+    state.hasInteracted = false;
     render();
   });
 
@@ -92,7 +95,8 @@
       yearRange: [...state.yearRange],
       fullYearRange: [...context.fullYearRange],
       selectedCountries: [...state.selectedCountries],
-      extraCountry: state.extraCountry
+      extraCountry: state.extraCountry,
+      hasInteracted: state.hasInteracted
     };
 
     const scene = window.NarrativeScenes.getSceneCopy(state.sceneIndex);
@@ -149,18 +153,21 @@
       const country = event.target.value;
       state.extraCountry = country;
       state.selectedCountries = country ? Array.from(new Set([...topCountries, country])) : [...topCountries];
+      state.hasInteracted = true;
       render();
     });
 
     elements.controls.querySelectorAll("[data-metric]").forEach((button) => {
       button.addEventListener("click", () => {
         state.metric = button.dataset.metric;
+        state.hasInteracted = true;
         render();
       });
     });
 
     elements.controls.querySelector("#reset-years").addEventListener("click", () => {
       state.yearRange = [...context.fullYearRange];
+      state.hasInteracted = true;
       render();
     });
   }
