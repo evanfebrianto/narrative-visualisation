@@ -2,7 +2,7 @@
   const config = {
     width: 960,
     height: 620,
-    margin: { top: 64, right: 164, bottom: 120, left: 82 },
+    margin: { top: 64, right: 164, bottom: 140, left: 82 },
     colors: {
       World: "#b45309",
       China: "#c2410c",
@@ -581,8 +581,29 @@
   }
 
   function addBrush(context, frame, x) {
-    const brushHeight = 24;
-    const brushTop = frame.innerHeight + 48;
+    const brushHeight = 40;
+    const brushTop = frame.innerHeight + 58;
+    const [minYear, maxYear] = context.state.yearRange;
+    const fullRange = context.fullYearRange;
+    const isPartial = minYear > fullRange[0] + 1 || maxYear < fullRange[1] - 1;
+
+    frame.plot
+      .append("text")
+      .attr("class", "brush-hint")
+      .attr("x", 0)
+      .attr("y", brushTop - 10)
+      .text("Drag across the bar below to select a year range.");
+
+    frame.plot
+      .append("rect")
+      .attr("class", "brush-track")
+      .attr("x", 0)
+      .attr("y", brushTop)
+      .attr("width", frame.innerWidth)
+      .attr("height", brushHeight)
+      .attr("rx", 8)
+      .attr("ry", 8);
+
     const brush = d3
       .brushX()
       .extent([
@@ -603,7 +624,7 @@
 
         const years = event.selection.map(x.invert).map(Math.round).sort(d3.ascending);
         if (years[1] - years[0] < 3) {
-          brushGroup.call(brush.move, null);
+          brushGroup.call(brush.move, isPartial ? [x(minYear), x(maxYear)] : null);
           return;
         }
 
@@ -612,11 +633,7 @@
         context.render();
       });
 
-    const brushGroup = frame.plot.append("g").attr("class", "brush").call(brush);
-    const [minYear, maxYear] = context.state.yearRange;
-    const fullRange = context.fullYearRange;
-    const isPartial =
-      minYear > fullRange[0] + 1 || maxYear < fullRange[1] - 1;
+    const brushGroup = frame.plot.append("g").attr("class", "brush").call(brush).raise();
 
     if (isPartial) {
       brushGroup.call(brush.move, [x(minYear), x(maxYear)]);
@@ -765,7 +782,7 @@
             note: {
               title: "Start exploring",
               label:
-                "Hover any line for exact values. Add a country above, or brush the timeline below to narrow the years.",
+                "Hover any line for exact values. Add a country above, set the year range with the dropdowns, or drag the timeline bar below.",
               wrap: 215
             }
           }

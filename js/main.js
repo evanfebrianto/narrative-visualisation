@@ -122,10 +122,13 @@
     }
 
     const extraCountry = state.extraCountry || "";
+    const [startYear, endYear] = state.yearRange;
+    const [fullStart, fullEnd] = context.fullYearRange;
+    const yearOptions = d3.range(fullStart, fullEnd + 1);
     elements.controls.classList.remove("is-hidden");
     const comparisonNote = buildComparisonNote(extraCountry);
     elements.controls.innerHTML = `
-      <p class="explore-hint">Hover over the chart to inspect values by year. Add a country to compare, or brush the timeline below to narrow the years.</p>
+      <p class="explore-hint">Hover the chart for exact values. Add a country, switch the metric, or set a year range with the dropdowns or the timeline bar under the chart.</p>
       <div class="controls-row">
         <div class="control-group">
           <label class="control-label" for="country-select">Add a comparison country</label>
@@ -144,8 +147,27 @@
             <button type="button" data-metric="co2_per_capita" class="${state.metric === "co2_per_capita" ? "is-active" : ""}">Per capita</button>
           </div>
         </div>
+      </div>
+      <div class="controls-row year-controls-row">
+        <div class="control-group">
+          <label class="control-label" for="year-start">Start year</label>
+          <select id="year-start">
+            ${yearOptions
+              .map((year) => `<option value="${year}"${year === startYear ? " selected" : ""}>${year}</option>`)
+              .join("")}
+          </select>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="year-end">End year</label>
+          <select id="year-end">
+            ${yearOptions
+              .map((year) => `<option value="${year}"${year === endYear ? " selected" : ""}>${year}</option>`)
+              .join("")}
+          </select>
+        </div>
         <button class="reset-button" type="button" id="reset-years">Reset years</button>
       </div>
+      <p class="year-range-label">Showing ${startYear} to ${endYear}</p>
       ${comparisonNote ? `<p id="comparison-note" class="comparison-note">${comparisonNote}</p>` : ""}
     `;
 
@@ -164,6 +186,22 @@
         render();
       });
     });
+
+    const applyYearRange = () => {
+      const nextStart = Number(elements.controls.querySelector("#year-start").value);
+      const nextEnd = Number(elements.controls.querySelector("#year-end").value);
+      if (!Number.isFinite(nextStart) || !Number.isFinite(nextEnd) || nextEnd - nextStart < 3) {
+        elements.controls.querySelector("#year-start").value = String(state.yearRange[0]);
+        elements.controls.querySelector("#year-end").value = String(state.yearRange[1]);
+        return;
+      }
+      state.yearRange = [Math.min(nextStart, nextEnd), Math.max(nextStart, nextEnd)];
+      state.hasInteracted = true;
+      render();
+    };
+
+    elements.controls.querySelector("#year-start").addEventListener("change", applyYearRange);
+    elements.controls.querySelector("#year-end").addEventListener("change", applyYearRange);
 
     elements.controls.querySelector("#reset-years").addEventListener("click", () => {
       state.yearRange = [...context.fullYearRange];
@@ -197,7 +235,7 @@
     const ratio = topLatest / Math.max(extraLatest, 0.001);
 
     if (state.metric === "co2" && ratio >= 25) {
-      return `<strong>${escapeHtml(extraCountry)}</strong> is highlighted, but its total emissions are far smaller than the top five on this linear scale. The line runs near the bottom — switch to <strong>Per capita</strong> for a fairer comparison.`;
+      return `<strong>${escapeHtml(extraCountry)}</strong> is highlighted, but its total emissions are far smaller than the top five on this linear scale. The line runs near the bottom - switch to <strong>Per capita</strong> for a fairer comparison.`;
     }
 
     if (state.metric === "co2" && ratio >= 8) {

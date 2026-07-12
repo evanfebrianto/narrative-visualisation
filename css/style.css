@@ -335,14 +335,43 @@ h2 {
   pointer-events: none;
 }
 
+.year-controls-row {
+  margin-top: 14px;
+}
+
+.year-range-label {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.brush-track {
+  fill: rgba(180, 83, 9, 0.08);
+  stroke: var(--border);
+  stroke-width: 1px;
+  pointer-events: none;
+}
+
+.brush .overlay {
+  fill: rgba(180, 83, 9, 0.02);
+  cursor: crosshair;
+  pointer-events: all;
+}
+
 .brush .selection {
-  fill: rgba(180, 83, 9, 0.18);
+  fill: rgba(180, 83, 9, 0.22);
   stroke: var(--accent);
+  stroke-width: 1.5px;
+}
+
+.brush .handle {
+  fill: var(--accent);
 }
 
 .brush-hint {
   fill: var(--muted);
   font-size: 12px;
+  pointer-events: none;
 }
 
 .tooltip {
