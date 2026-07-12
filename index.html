@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CO2 Emissions Narrative Visualization</title>
-  <link rel="stylesheet" href="css/style.css?v=20260712">
+  <link rel="stylesheet" href="css/style.css?v=20260712b">
 </head>
 <body>
   <main class="page-shell">
@@ -34,7 +34,6 @@
 
       <div class="chart-wrap">
         <svg id="chart" viewBox="0 0 960 620" role="img" aria-labelledby="scene-title scene-summary"></svg>
-        <div id="tooltip" class="tooltip is-hidden"></div>
       </div>
 
       <nav class="story-nav" aria-label="Story navigation">
@@ -42,6 +41,8 @@
         <button id="next-scene" type="button">Next</button>
       </nav>
     </section>
+
+    <div id="tooltip" class="tooltip is-hidden"></div>
 
     <footer class="source-note">
       Data: <a href="https://github.com/owid/co2-data" target="_blank" rel="noopener">Our World in Data CO2 dataset</a>.
@@ -51,7 +52,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-annotation/2.5.1/d3-annotation.min.js"></script>
-  <script src="js/scenes.js?v=20260712"></script>
-  <script src="js/main.js?v=20260712"></script>
+  <script src="js/scenes.js?v=20260712b"></script>
+  <script src="js/main.js?v=20260712b"></script>
 </body>
 </html>

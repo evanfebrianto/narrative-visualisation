@@ -247,31 +247,37 @@
 
   function showTooltip(anchor, content) {
     const rows = content.rows.map((row) => `<span>${escapeHtml(row)}</span>`).join("<br>");
-    const tooltipWidth = 230;
-    const tooltipHeight = 90;
-    const offset = 14;
-    let left = anchor.x + offset;
-    let top = anchor.y - tooltipHeight / 2;
-
-    if (left + tooltipWidth > window.innerWidth - 12) {
-      left = anchor.x - tooltipWidth - offset;
-    }
-    if (left < 12) {
-      left = 12;
-    }
-    if (top < 12) {
-      top = anchor.y + offset;
-    }
-    if (top + tooltipHeight > window.innerHeight - 12) {
-      top = anchor.y - tooltipHeight - offset;
-    }
+    const offset = 16;
+    const pad = 12;
 
     elements.tooltip
       .classed("is-hidden", false)
       .style("--tooltip-accent", content.color || "#b45309")
       .html(`<strong>${escapeHtml(content.title)}</strong>${rows}`)
-      .style("left", `${left}px`)
-      .style("top", `${top}px`);
+      .style("left", "-9999px")
+      .style("top", "0px");
+
+    const node = elements.tooltip.node();
+    const tooltipWidth = node.offsetWidth || 230;
+    const tooltipHeight = node.offsetHeight || 90;
+    const preferLeft = anchor.x > window.innerWidth * 0.58;
+    let left = preferLeft ? anchor.x - tooltipWidth - offset : anchor.x + offset;
+    let top = anchor.y - tooltipHeight / 2;
+
+    if (left + tooltipWidth > window.innerWidth - pad) {
+      left = anchor.x - tooltipWidth - offset;
+    }
+    if (left < pad) {
+      left = pad;
+    }
+    if (top < pad) {
+      top = pad;
+    }
+    if (top + tooltipHeight > window.innerHeight - pad) {
+      top = Math.max(pad, window.innerHeight - tooltipHeight - pad);
+    }
+
+    elements.tooltip.style("left", `${left}px`).style("top", `${top}px`);
   }
 
   function hideTooltip() {
