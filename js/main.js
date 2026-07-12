@@ -128,10 +128,10 @@
     elements.controls.classList.remove("is-hidden");
     const comparisonNote = buildComparisonNote(extraCountry);
     elements.controls.innerHTML = `
-      <p class="explore-hint">Hover the chart for exact values. Add a country, switch the metric, or set a year range with the dropdowns or the timeline bar under the chart.</p>
+      <p class="explore-hint">First: add a country to compare. Then switch the metric or narrow the years.</p>
       <div class="controls-row">
-        <div class="control-group">
-          <label class="control-label" for="country-select">Add a comparison country</label>
+        <div class="control-group control-group-primary">
+          <label class="control-label" for="country-select">Add a country</label>
           <select id="country-select">
             <option value="">Top five only</option>
             ${context.countryNames
@@ -143,31 +143,28 @@
         <div class="control-group">
           <p class="control-label">Metric</p>
           <div class="metric-toggle" role="group" aria-label="Metric">
-            <button type="button" data-metric="co2" class="${state.metric === "co2" ? "is-active" : ""}">Total emissions</button>
+            <button type="button" data-metric="co2" class="${state.metric === "co2" ? "is-active" : ""}">Total</button>
             <button type="button" data-metric="co2_per_capita" class="${state.metric === "co2_per_capita" ? "is-active" : ""}">Per capita</button>
           </div>
         </div>
-      </div>
-      <div class="controls-row year-controls-row">
-        <div class="control-group">
-          <label class="control-label" for="year-start">Start year</label>
-          <select id="year-start">
-            ${yearOptions
-              .map((year) => `<option value="${year}"${year === startYear ? " selected" : ""}>${year}</option>`)
-              .join("")}
-          </select>
+        <div class="control-group year-controls">
+          <p class="control-label">Years</p>
+          <div class="year-selects">
+            <select id="year-start" aria-label="Start year">
+              ${yearOptions
+                .map((year) => `<option value="${year}"${year === startYear ? " selected" : ""}>${year}</option>`)
+                .join("")}
+            </select>
+            <span class="year-sep">to</span>
+            <select id="year-end" aria-label="End year">
+              ${yearOptions
+                .map((year) => `<option value="${year}"${year === endYear ? " selected" : ""}>${year}</option>`)
+                .join("")}
+            </select>
+            <button class="reset-button" type="button" id="reset-years">Reset</button>
+          </div>
         </div>
-        <div class="control-group">
-          <label class="control-label" for="year-end">End year</label>
-          <select id="year-end">
-            ${yearOptions
-              .map((year) => `<option value="${year}"${year === endYear ? " selected" : ""}>${year}</option>`)
-              .join("")}
-          </select>
-        </div>
-        <button class="reset-button" type="button" id="reset-years">Reset years</button>
       </div>
-      <p class="year-range-label">Showing ${startYear} to ${endYear}</p>
       ${comparisonNote ? `<p id="comparison-note" class="comparison-note">${comparisonNote}</p>` : ""}
     `;
 

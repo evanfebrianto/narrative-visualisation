@@ -20,25 +20,25 @@
       kicker: "Scene 1 of 4",
       title: "The post-1950 surge changed the scale of the problem",
       summary:
-        "Global annual CO2 emissions were modest by modern standards for most of the record, then accelerated sharply after 1950."
+        "Start with the global picture: annual CO2 emissions stayed modest for decades, then rose sharply after 1950."
     },
     {
       kicker: "Scene 2 of 4",
       title: "A small group of countries drives much of the annual total",
       summary:
-        "The guided story narrows from the global total to the largest country emitters, revealing a shift in leadership during the 2000s."
+        "Zoom from the world total to the largest emitters. Watch China and the United States: China overtakes the US in annual emissions in the mid-2000s."
     },
     {
       kicker: "Scene 3 of 4",
       title: "Per-capita emissions complicate the responsibility story",
       summary:
-        "The same countries look different when emissions are divided by population: totals and per-person impact answer different questions."
+        "Keep the same countries, but switch the metric. Totals and per-person intensity tell different stories, especially for the United States and India."
     },
     {
       kicker: "Scene 4 of 4",
       title: "Explore the bowl: choose a country, metric, and time window",
       summary:
-        "The author-led path now opens into free-form exploration. Use the controls, hover over lines, and brush the timeline to compare patterns."
+        "The guided story ends here. Add a country, switch the metric, or narrow the years to test your own comparison."
     }
   ];
 
@@ -63,17 +63,25 @@
 
     return {
       key: "co2",
-      label: "CO2 emissions (million tonnes)",
+      label: "CO2 emissions",
       shortLabel: "Annual emissions",
       axisFormat: (value) => {
+        if (value === 0) {
+          return "0";
+        }
         if (value >= 1000) {
           const gigatonnes = value / 1000;
           const format = gigatonnes < 10 && !Number.isInteger(gigatonnes) ? ".1f" : ".0f";
           return `${d3.format(format)(gigatonnes)} Gt`;
         }
-        return d3.format(".0f")(value);
+        return `${d3.format(".0f")(value)} Mt`;
       },
-      tooltipFormat: (value) => `${d3.format(",.1f")(value)} million tonnes`
+      tooltipFormat: (value) => {
+        if (value >= 1000) {
+          return `${d3.format(",.2f")(value / 1000)} Gt`;
+        }
+        return `${d3.format(",.1f")(value)} Mt`;
+      }
     };
   }
 
@@ -562,6 +570,23 @@
     const layer = drawLines(context, frame, options.series, x, y, metricInfo, options);
     drawLegend(frame, options.series);
 
+    if (options.markerYear != null) {
+      const markerX = x(options.markerYear);
+      frame.plot
+        .append("line")
+        .attr("class", "year-marker")
+        .attr("x1", markerX)
+        .attr("x2", markerX)
+        .attr("y1", 0)
+        .attr("y2", frame.innerHeight);
+      frame.plot
+        .append("text")
+        .attr("class", "year-marker-label")
+        .attr("x", markerX + 8)
+        .attr("y", 14)
+        .text(options.markerLabel || String(options.markerYear));
+    }
+
     const annotations = (options.annotations || []).map((annotation) => {
       return {
         ...annotation,
@@ -592,7 +617,7 @@
       .attr("class", "brush-hint")
       .attr("x", 0)
       .attr("y", brushTop - 10)
-      .text("Drag across the bar below to select a year range.");
+      .text("Or drag the timeline to set years.");
 
     frame.plot
       .append("rect")
@@ -691,6 +716,9 @@
       series,
       xDomain: yearRange,
       curve: d3.curveLinear,
+      focusCountries: ["China", "United States"],
+      markerYear: crossover.year,
+      markerLabel: `${crossover.labelYear} crossover`,
       annotations: [
         {
           year: crossover.year,
@@ -699,8 +727,8 @@
           dy: -76,
           subject: { radius: 7, stroke: "#c2410c", fill: "#fffaf2", fillOpacity: 0.95 },
           note: {
-            title: "A leadership shift",
-            label: `China overtakes the United States in annual emissions around ${crossover.labelYear}.`,
+            title: "China overtakes the US",
+            label: `Around ${crossover.labelYear}, China becomes the largest annual emitter among countries.`,
             wrap: 185
           }
         }
@@ -781,9 +809,8 @@
             subject: { radius: 7, stroke: colorFor(highest.name), fill: "#fffaf2", fillOpacity: 0.95 },
             note: {
               title: "Start exploring",
-              label:
-                "Hover any line for exact values. Add a country above, set the year range with the dropdowns, or drag the timeline bar below.",
-              wrap: 215
+              label: "Add a country above, or hover a line for exact values.",
+              wrap: 190
             }
           }
         ];
